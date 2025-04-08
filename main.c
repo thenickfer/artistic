@@ -39,11 +39,17 @@ typedef struct
     int x, y;
 } EdgeCoord;
 
-typedef struct EdgeNode
+/* typedef struct EdgeNode
 {
     EdgeCoord coord;
     struct EdgeNode *next;
-} EdgeNode;
+} EdgeNode; */
+
+typedef struct
+{
+    int size;
+    EdgeCoord coord[10000];
+} EdgeArray;
 
 // Protótipos
 void load(char *name, Img *pic);
@@ -79,7 +85,40 @@ void load(char *name, Img *pic)
     printf("Load: %d x %d x %d\n", pic->width, pic->height, chan);
 }
 
-EdgeCoord getNearestEdge(int x, int y, EdgeNode *head)
+EdgeCoord getNearestEdge(int x, int y, EdgeArray *edgeArray)
+{
+    EdgeCoord nearest = edgeArray->coord[0];
+    float nearestDist = sqrt(pow(nearest.x, 2) + pow(nearest.y, 2));
+    for (int i = 0; i < edgeArray->size; i++)
+    {
+        EdgeCoord curr = edgeArray->coord[i];
+        float currDist = sqrt(pow(curr.x, 2) + pow(curr.y, 2));
+        if (currDist < nearestDist)
+        {
+            nearestDist = currDist;
+            nearest = curr;
+        }
+    }
+}
+
+void addNode(int x, int y, EdgeArray *edgeArray)
+{
+    int i;
+
+    for (i = 0; i < edgeArray->size; i++)
+    {
+        if (edgeArray->coord[i].x == x && edgeArray->coord[i].y == y)
+        {
+            return;
+        }
+    }
+    edgeArray->size += 1;
+    edgeArray->coord[i].x = x;
+    edgeArray->coord[i].y = y;
+}
+
+// Usando EdgeNode como LinkedList
+/* EdgeCoord getNearestEdge(int x, int y, EdgeNode *head)
 {
     EdgeNode *aux = head;
     EdgeCoord nearest = aux->coord;
@@ -114,7 +153,7 @@ EdgeNode *addNode(int x, int y, EdgeNode *head)
     aux->next = head;
     head = aux;
     return head;
-}
+} */
 
 int main(int argc, char **argv)
 {
@@ -171,7 +210,7 @@ int main(int argc, char **argv)
     // ...
     // ...
     // Exemplo: copia apenas o componente vermelho para a saida
-    /* float mediaR, mediaG, mediaB = 0;
+    float mediaR, mediaG, mediaB = 0;
 
     for (int y = 0; y < height; y++)
     {
@@ -205,7 +244,8 @@ int main(int argc, char **argv)
     int threshold = ((varR) + (varG) + (varB)) / 3;
     // Isso foi tudo pra definir um threshold com base na variancia de cor, provavelmente seja melhor trocar esse metodo por algo mais eficiente
 
-    EdgeNode *head = NULL;
+    EdgeArray arr;
+    arr.size = 0;
 
     for (int y = 0; y < height - 1; y++)
     {
@@ -216,11 +256,11 @@ int main(int argc, char **argv)
 
             if (diffX || diffY)
             {
-                head = addNode(x, y, head);
+                addNode(x, y, &arr);
                 if (diffX)
-                    head = addNode(x + 1, y, head);
+                    addNode(x + 1, y, &arr);
                 if (diffY)
-                    head = addNode(x, y + 1, head);
+                    addNode(x, y + 1, &arr);
             }
         }
     }
@@ -229,17 +269,14 @@ int main(int argc, char **argv)
     {
         for (int x = 0; x < width; x++)
         {
-            EdgeCoord aux = getNearestEdge(x, y, head);
+            EdgeCoord aux = getNearestEdge(x, y, &arr);
             out[y][x].r = in[aux.y][aux.x].r;
             out[y][x].g = in[aux.y][aux.x].g;
             out[y][x].b = in[aux.y][aux.x].b;
         }
     }
 
-
-    free(head); */
-
-    for (int y = 0; y < height; y++)
+    /* for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
         {
@@ -247,7 +284,7 @@ int main(int argc, char **argv)
             out[y][x].g = in[y][x].g;
             out[y][x].b = in[y][x].b;
         }
-    }
+    } */
     // Cria texturas em memória a partir dos pixels das imagens
     tex[0] = SOIL_create_OGL_texture((unsigned char *)pic[0].img, width, height, SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
     tex[1] = SOIL_create_OGL_texture((unsigned char *)pic[1].img, width, height, SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
@@ -261,7 +298,7 @@ void keyboard(unsigned char key, int x, int y)
 {
     if (key == 27)
     {
-        // ESC: libera memória e finaliza
+        // ESC: libera memória e finaliza　
         free(pic[0].img);
         free(pic[1].img);
         exit(1);
