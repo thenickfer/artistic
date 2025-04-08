@@ -48,7 +48,7 @@ typedef struct
 typedef struct
 {
     int size;
-    EdgeCoord coord[10000];
+    EdgeCoord coord[100000];
 } EdgeArray;
 
 // Protótipos
@@ -87,6 +87,11 @@ void load(char *name, Img *pic)
 
 EdgeCoord getNearestEdge(int x, int y, EdgeArray *edgeArray)
 {
+    if (edgeArray->size == 0)
+    {
+        printf("Error: EdgeArray is empty.\n");
+        return (EdgeCoord){-1, -1}; // Return an invalid coordinate
+    }
     EdgeCoord nearest = edgeArray->coord[0];
     float nearestDist = sqrt(pow(nearest.x, 2) + pow(nearest.y, 2));
     for (int i = 0; i < edgeArray->size; i++)
@@ -103,18 +108,21 @@ EdgeCoord getNearestEdge(int x, int y, EdgeArray *edgeArray)
 
 void addNode(int x, int y, EdgeArray *edgeArray)
 {
-    int i;
-
-    for (i = 0; i < edgeArray->size; i++)
+    if (edgeArray->size >= 100000)
+    {
+        printf("Error: EdgeArray capacity exceeded.\n");
+        return;
+    }
+    for (int i = 0; i < edgeArray->size; i++)
     {
         if (edgeArray->coord[i].x == x && edgeArray->coord[i].y == y)
         {
             return;
         }
     }
+    edgeArray->coord[edgeArray->size].x = x;
+    edgeArray->coord[edgeArray->size].y = y;
     edgeArray->size += 1;
-    edgeArray->coord[i].x = x;
-    edgeArray->coord[i].y = y;
 }
 
 // Usando EdgeNode como LinkedList
@@ -210,7 +218,7 @@ int main(int argc, char **argv)
     // ...
     // ...
     // Exemplo: copia apenas o componente vermelho para a saida
-    float mediaR, mediaG, mediaB = 0;
+    double mediaR, mediaG, mediaB = 0;
 
     for (int y = 0; y < height; y++)
     {
@@ -225,7 +233,7 @@ int main(int argc, char **argv)
     mediaG /= (height * width);
     mediaB /= (height * width);
 
-    float varR, varG, varB = 0;
+    double varR, varG, varB = 0;
 
     for (int y = 0; y < height; y++)
     {
