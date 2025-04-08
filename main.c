@@ -93,11 +93,11 @@ EdgeCoord getNearestEdge(int x, int y, EdgeArray *edgeArray)
         return (EdgeCoord){-1, -1}; // Return an invalid coordinate
     }
     EdgeCoord nearest = edgeArray->coord[0];
-    float nearestDist = sqrt(pow(nearest.x, 2) + pow(nearest.y, 2));
+    float nearestDist = sqrt(pow(nearest.x - x, 2) + pow(nearest.y - y, 2));
     for (int i = 0; i < edgeArray->size; i++)
     {
         EdgeCoord curr = edgeArray->coord[i];
-        float currDist = sqrt(pow(curr.x, 2) + pow(curr.y, 2));
+        float currDist = sqrt(pow(curr.x - x, 2) + pow(curr.y - y, 2));
         if (currDist < nearestDist)
         {
             nearestDist = currDist;
