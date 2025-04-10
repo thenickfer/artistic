@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h> // Para usar strings
 #include <stdbool.h>
+#include <time.h>
 
 #ifdef WIN32
 #include <windows.h> // Apenas para Windows
@@ -48,7 +49,7 @@ typedef struct
 typedef struct
 {
     int size;
-    EdgeCoord coord[100000];
+    EdgeCoord coord[500000];
 } EdgeArray;
 
 // Protótipos
@@ -104,11 +105,12 @@ EdgeCoord getNearestEdge(int x, int y, EdgeArray *edgeArray)
             nearest = curr;
         }
     }
+    return nearest;
 }
 
 void addNode(int x, int y, EdgeArray *edgeArray)
 {
-    if (edgeArray->size >= 100000)
+    if (edgeArray->size >= 500000)
     {
         printf("Error: EdgeArray capacity exceeded.\n");
         return;
@@ -120,18 +122,18 @@ void addNode(int x, int y, EdgeArray *edgeArray)
             return;
         }
     }
-    edgeArray->coord[edgeArray->size].x = x;
-    edgeArray->coord[edgeArray->size].y = y;
+    EdgeCoord aux = (EdgeCoord) {x, y};
+    edgeArray->coord[edgeArray->size] = aux;
     edgeArray->size += 1;
 }
 
 // Usando EdgeNode como LinkedList
 /* EdgeCoord getNearestEdge(int x, int y, EdgeNode *head)
 {
-    EdgeNode *aux = head;
+    EdgeNode *aux = head;      
     EdgeCoord nearest = aux->coord;
     float nearestDist = sqrt(pow(nearest.x, 2) + pow(nearest.y, 2));
-    while (aux != NULL)
+    while (aux != NULL)       
     {
         aux = aux->next;
         EdgeCoord curr = aux->coord;
@@ -248,22 +250,24 @@ int main(int argc, char **argv)
     varR /= (height * width);
     varG /= (height * width);
     varB /= (height * width);
-
+    
     int threshold = ((varR) + (varG) + (varB)) / 3;
+    threshold=120;
     // Isso foi tudo pra definir um threshold com base na variancia de cor, provavelmente seja melhor trocar esse metodo por algo mais eficiente
 
     EdgeArray arr;
     arr.size = 0;
 
-    for (int y = 0; y < height - 1; y++)
+    /*for (int y = 0; y < height - 1; y++)
     {
         for (int x = 0; x < width - 1; x++)
         {
-            bool diffX = (pow(in[y][x].r - in[y][x + 1].r, 2) + pow(in[y][x].g - in[y][x + 1].g, 2) + pow(in[y][x].b - in[y][x + 1].b, 2)) >= threshold;
-            bool diffY = (pow(in[y][x].r - in[y + 1][x].r, 2) + pow(in[y][x].g - in[y + 1][x].g, 2) + pow(in[y][x].b - in[y + 1][x].b, 2)) >= threshold;
+            bool diffX = ((in[y][x].r - in[y][x + 1].r) + (in[y][x].g - in[y][x + 1].g) + (in[y][x].b - in[y][x + 1].b))/3 > threshold;
+            bool diffY = ((in[y][x].r - in[y + 1][x].r) + (in[y][x].g - in[y + 1][x].g) + (in[y][x].b - in[y + 1][x].b))/3 > threshold;
 
             if (diffX || diffY)
             {
+                
                 addNode(x, y, &arr);
                 if (diffX)
                     addNode(x + 1, y, &arr);
@@ -271,6 +275,14 @@ int main(int argc, char **argv)
                     addNode(x, y + 1, &arr);
             }
         }
+    } */
+
+    srand(time(NULL));
+
+
+    for (int y = 0; y < 6000 - 1; y++)
+    {   
+        addNode(rand()%600, rand()%800, &arr);
     }
 
     for (int y = 0; y < height; y++)
