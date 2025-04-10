@@ -22,6 +22,7 @@
 // SOIL é a biblioteca para leitura das imagens
 #include "SOIL.h"
 
+
 // Um pixel Pixel (24 bits)
 typedef struct
 {
@@ -251,19 +252,19 @@ int main(int argc, char **argv)
     varG /= (height * width);
     varB /= (height * width);
     
-    int threshold = ((varR) + (varG) + (varB)) / 3;
-    threshold=120;
+    int threshold = ((varR) + (varG) + (varB)) / 3; //calcular com a threshold por cor ao inves de media
+    threshold=120; //fica muito baixo pela variancia
     // Isso foi tudo pra definir um threshold com base na variancia de cor, provavelmente seja melhor trocar esse metodo por algo mais eficiente
 
     EdgeArray arr;
     arr.size = 0;
 
-    /*for (int y = 0; y < height - 1; y++)
+    for (int y = 0; y < height - 1; y++)
     {
-        for (int x = 0; x < width - 1; x++)
+        for (int x = 0; x < width -1; x++)
         {
-            bool diffX = ((in[y][x].r - in[y][x + 1].r) + (in[y][x].g - in[y][x + 1].g) + (in[y][x].b - in[y][x + 1].b))/3 > threshold;
-            bool diffY = ((in[y][x].r - in[y + 1][x].r) + (in[y][x].g - in[y + 1][x].g) + (in[y][x].b - in[y + 1][x].b))/3 > threshold;
+            bool diffX = sqrt(pow(((in[y][x].r - in[y][x + 1].r) + (in[y][x].g - in[y][x + 1].g) + (in[y][x].b - in[y][x + 1].b)), 2))/3 > threshold;
+            bool diffY = sqrt(pow(((in[y][x].r - in[y + 1][x].r) + (in[y][x].g - in[y + 1][x].g) + (in[y][x].b - in[y + 1][x].b)), 2))/3 > threshold;
 
             if (diffX || diffY)
             {
@@ -275,14 +276,21 @@ int main(int argc, char **argv)
                     addNode(x, y + 1, &arr);
             }
         }
-    } */
+    } 
+
 
     srand(time(NULL));
 
-
-    for (int y = 0; y < 6000 - 1; y++)
+    for (int i = 0; i < arr.size - 1; i++)
     {   
-        addNode(rand()%600, rand()%800, &arr);
+        EdgeCoord *teste = &(arr.coord[i]);
+
+        int offsetX = width - (width - teste->x);
+        int offsetY = height - (height - teste->y); 
+
+        teste->x += ((rand()%width)-offsetX)/4;
+        teste->y += ((rand()%height)-offsetY)/4;
+        
     }
 
     for (int y = 0; y < height; y++)
@@ -294,6 +302,13 @@ int main(int argc, char **argv)
             out[y][x].g = in[aux.y][aux.x].g;
             out[y][x].b = in[aux.y][aux.x].b;
         }
+    }
+
+    for(int i=0;i<arr.size;i++){
+        EdgeCoord coord = arr.coord[i];
+        in[coord.y][coord.x].r = 255;
+        in[coord.y][coord.x].g = 0;
+        in[coord.y][coord.x].b = 0;
     }
 
     /* for (int y = 0; y < height; y++)
