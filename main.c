@@ -221,50 +221,45 @@ int main(int argc, char **argv)
     // ...
     // ...
     // Exemplo: copia apenas o componente vermelho para a saida
-    double mediaR, mediaG, mediaB = 0;
+    double media= 0;
 
     for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
         {
-            mediaR += in[y][x].r;
-            mediaG += in[y][x].g;
-            mediaB += in[y][x].b;
+            media += (in[y][x].r*0.299 + 0.587*in[y][x].g + 0.114*in[y][x].b);
         }
     }
-    mediaR /= (height * width);
-    mediaG /= (height * width);
-    mediaB /= (height * width);
+    media /= (height * width);
 
-    double varR, varG, varB = 0;
+
+    double var= 0;
 
     for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
         {
-            varR += pow(in[y][x].r - mediaR, 2);
-            varG += pow(in[y][x].g - mediaG, 2);
-            varB += pow(in[y][x].b - mediaB, 2);
+            var += pow((in[y][x].r*0.299 + 0.587*in[y][x].g + 0.114*in[y][x].b) - media, 2);
         }
     }
 
-    varR /= (height * width);
-    varG /= (height * width);
-    varB /= (height * width);
+    var /= (height * width);
     
-    int threshold = ((varR) + (varG) + (varB)) / 3; //calcular com a threshold por cor ao inves de media
-    threshold=120; //fica muito baixo pela variancia
+    int threshold = sqrt(var); //calcular com a threshold por cor ao inves de media
     // Isso foi tudo pra definir um threshold com base na variancia de cor, provavelmente seja melhor trocar esse metodo por algo mais eficiente
 
     EdgeArray arr;
     arr.size = 0;
 
+    //Obs, isso tudo se tornou extremamente ineficiente, talvez fosse melhor comparar cada pixel com uma regiao vizinha ao inves 
+    //de so comparar com o da direita e o de baixo, pra assim nao precisar calcular a variancia e evitar ruido na imagem
+
     for (int y = 0; y < height - 1; y++)
     {
         for (int x = 0; x < width -1; x++)
         {
-            bool diffX = sqrt(pow(((in[y][x].r - in[y][x + 1].r) + (in[y][x].g - in[y][x + 1].g) + (in[y][x].b - in[y][x + 1].b)), 2))/3 > threshold;
-            bool diffY = sqrt(pow(((in[y][x].r - in[y + 1][x].r) + (in[y][x].g - in[y + 1][x].g) + (in[y][x].b - in[y + 1][x].b)), 2))/3 > threshold;
+            bool diffX = sqrt(pow(((in[y][x].r*0.299 + 0.587*in[y][x].g + 0.114*in[y][x].b) - (in[y][x+1].r*0.299 + 0.587*in[y][x+1].g + 0.114*in[y][x+1].b)), 2)) > threshold;
+            bool diffY = sqrt(pow(((in[y][x].r*0.299 + 0.587*in[y][x].g + 0.114*in[y][x].b)- (in[y+1][x].r*0.299 + 0.587*in[y+1][x].g + 0.114*in[y+1][x].b)), 2)) > threshold;
 
             if (diffX || diffY)
             {
