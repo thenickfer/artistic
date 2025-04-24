@@ -167,7 +167,10 @@ EdgeNode *addNode(int x, int y, EdgeNode *head)
 } */
 
 int main(int argc, char **argv)
-{
+{   
+
+    clock_t tstart = clock();
+
     if (argc < 1)
     {
         printf("artistic [im. entrada]\n");
@@ -221,57 +224,43 @@ int main(int argc, char **argv)
     // ...
     // ...
     // Exemplo: copia apenas o componente vermelho para a saida
-    double media= 0;
-
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            media += (in[y][x].r*0.299 + 0.587*in[y][x].g + 0.114*in[y][x].b);
-        }
-    }
-    media /= (height * width);
-
-
-    double var= 0;
-
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            var += pow((in[y][x].r*0.299 + 0.587*in[y][x].g + 0.114*in[y][x].b) - media, 2);
-        }
-    }
-
-    var /= (height * width);
     
-    int threshold = sqrt(var); //calcular com a threshold por cor ao inves de media
-    // Isso foi tudo pra definir um threshold com base na variancia de cor, provavelmente seja melhor trocar esse metodo por algo mais eficiente
+    int sobelX[3][3] = {{-1, 0, 1}, {-2, 0 , 2}, {-1, 0, 1}};
+    int sobelY[3][3] = {{-1, -2, -1}, {0, 0 , 0}, {1, 2, 1}};
 
     EdgeArray arr;
     arr.size = 0;
 
+    
+
     //Obs, isso tudo se tornou extremamente ineficiente, talvez fosse melhor comparar cada pixel com uma regiao vizinha ao inves 
     //de so comparar com o da direita e o de baixo, pra assim nao precisar calcular a variancia e evitar ruido na imagem
 
-    for (int y = 0; y < height - 1; y++)
+    for (int y = 1; y < height - 1; y++)
     {
-        for (int x = 0; x < width -1; x++)
+        for (int x = 1; x < width -1; x++)
         {
-            bool diffX = sqrt(pow(((in[y][x].r*0.299 + 0.587*in[y][x].g + 0.114*in[y][x].b) - (in[y][x+1].r*0.299 + 0.587*in[y][x+1].g + 0.114*in[y][x+1].b)), 2)) > threshold;
-            bool diffY = sqrt(pow(((in[y][x].r*0.299 + 0.587*in[y][x].g + 0.114*in[y][x].b)- (in[y+1][x].r*0.299 + 0.587*in[y+1][x].g + 0.114*in[y+1][x].b)), 2)) > threshold;
-
-            if (diffX || diffY)
-            {
-                
-                addNode(x, y, &arr);
-                if (diffX)
-                    addNode(x + 1, y, &arr);
-                if (diffY)
-                    addNode(x, y + 1, &arr);
+            int gradienteX = 0;
+            int gradienteY = 0;
+            for(int i=-1; i<2; i++){
+                for(int j = -1; j<2; j++){
+                    int grayscalePix = (in[y+i][x+j].r*0.299 + 0.587*in[y+i][x+j].g + 0.114*in[y+i][x+j].b);
+                    gradienteX += grayscalePix * sobelX[i+1][j+1];
+                    gradienteY += grayscalePix * sobelY[i+1][j+1];
+                }
             }
+
+            int mag = (int)sqrt(gradienteX*gradienteX + gradienteY*gradienteY);
+            if( mag > 100){
+                addNode(x, y, &arr);
+            }
+
         }
     } 
+
+
+
+
 
 
     srand(time(NULL));
@@ -299,13 +288,12 @@ int main(int argc, char **argv)
         }
     }
 
-    for(int i=0;i<arr.size;i++){
-        EdgeCoord coord = arr.coord[i];
-        in[coord.y][coord.x].r = 255;
-        in[coord.y][coord.x].g = 0;
-        in[coord.y][coord.x].b = 0;
-    }
+    clock_t tend = clock();
 
+    double tempo = ((double)(tend-tstart))/CLOCKS_PER_SEC;
+
+    printf("Tempo para carregar: %.6f segundos", tempo);
+    
     /* for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
@@ -318,6 +306,7 @@ int main(int argc, char **argv)
     // Cria texturas em memória a partir dos pixels das imagens
     tex[0] = SOIL_create_OGL_texture((unsigned char *)pic[0].img, width, height, SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
     tex[1] = SOIL_create_OGL_texture((unsigned char *)pic[1].img, width, height, SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
+
 
     // Entra no loop de eventos, não retorna
     glutMainLoop();
