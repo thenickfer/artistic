@@ -22,7 +22,6 @@
 // SOIL é a biblioteca para leitura das imagens
 #include "SOIL.h"
 
-
 // Um pixel Pixel (24 bits)
 typedef struct
 {
@@ -109,32 +108,39 @@ EdgeCoord getNearestEdge(int x, int y, EdgeArray *edgeArray)
     return nearest;
 }
 
-void addNode(int x, int y, EdgeArray *edgeArray)
+void addNode(int x, int y, EdgeArray *edgeArray, bool (*visited)[width])
 {
+    if (visited[y][x])
+        return;
+
+    visited[y][x] = true;
+
     if (edgeArray->size >= 500000)
     {
         printf("Error: EdgeArray capacity exceeded.\n");
         return;
     }
+
+    edgeArray->coord[edgeArray->size++] = (EdgeCoord){x, y};
+    /*
     for (int i = 0; i < edgeArray->size; i++)
     {
         if (edgeArray->coord[i].x == x && edgeArray->coord[i].y == y)
         {
             return;
         }
-    }
-    EdgeCoord aux = (EdgeCoord) {x, y};
-    edgeArray->coord[edgeArray->size] = aux;
-    edgeArray->size += 1;
+    }*/
+
+    // Aqui era o principal problema de performance, foi melhor implementar um hash pra testar se foi visitado, mas mesmo assim vai ser lento sem multithreading (o que nao sei fazer)
 }
 
 // Usando EdgeNode como LinkedList
 /* EdgeCoord getNearestEdge(int x, int y, EdgeNode *head)
 {
-    EdgeNode *aux = head;      
+    EdgeNode *aux = head;
     EdgeCoord nearest = aux->coord;
     float nearestDist = sqrt(pow(nearest.x, 2) + pow(nearest.y, 2));
-    while (aux != NULL)       
+    while (aux != NULL)
     {
         aux = aux->next;
         EdgeCoord curr = aux->coord;
@@ -167,7 +173,7 @@ EdgeNode *addNode(int x, int y, EdgeNode *head)
 } */
 
 int main(int argc, char **argv)
-{   
+{
 
     clock_t tstart = clock();
 
@@ -224,57 +230,163 @@ int main(int argc, char **argv)
     // ...
     // ...
     // Exemplo: copia apenas o componente vermelho para a saida
-    
-    int sobelX[3][3] = {{-1, 0, 1}, {-2, 0 , 2}, {-1, 0, 1}};
-    int sobelY[3][3] = {{-1, -2, -1}, {0, 0 , 0}, {1, 2, 1}};
+
+    int sobelX[3][3] = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
+    int sobelY[3][3] = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
 
     EdgeArray arr;
     arr.size = 0;
 
-    
-
-    //Obs, isso tudo se tornou extremamente ineficiente, talvez fosse melhor comparar cada pixel com uma regiao vizinha ao inves 
-    //de so comparar com o da direita e o de baixo, pra assim nao precisar calcular a variancia e evitar ruido na imagem
+    int medias[3][3];
 
     for (int y = 1; y < height - 1; y++)
     {
-        for (int x = 1; x < width -1; x++)
+        for (int x = 1; x < width / 3; x++)
         {
             int gradienteX = 0;
             int gradienteY = 0;
-            for(int i=-1; i<2; i++){
-                for(int j = -1; j<2; j++){
-                    int grayscalePix = (in[y+i][x+j].r*0.299 + 0.587*in[y+i][x+j].g + 0.114*in[y+i][x+j].b);
-                    gradienteX += grayscalePix * sobelX[i+1][j+1];
-                    gradienteY += grayscalePix * sobelY[i+1][j+1];
+            for (int i = -1; i < 2; i++)
+            {
+                for (int j = -1; j < 2; j++)
+                {
+                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
+                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
+                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
                 }
             }
 
-            int mag = (int)sqrt(gradienteX*gradienteX + gradienteY*gradienteY);
-            if( mag > 100){
-                addNode(x, y, &arr);
+            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
+            if (y < height / 3)
+            {
+                medias[0][0] += mag;
+            }
+            else if (y < 2 * height / 3)
+            {
+                medias[1][0] += mag;
+            }
+            else
+            {
+                medias[2][0] += mag;
+            }
+        }
+        for (int x = width / 3; x < 2 * width / 3; x++)
+        {
+            int gradienteX = 0;
+            int gradienteY = 0;
+            for (int i = -1; i < 2; i++)
+            {
+                for (int j = -1; j < 2; j++)
+                {
+                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
+                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
+                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
+                }
             }
 
+            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
+            if (y < height / 3)
+            {
+                medias[0][1] += mag;
+            }
+            else if (y < 2 * height / 3)
+            {
+                medias[1][1] += mag;
+            }
+            else
+            {
+                medias[2][1] += mag;
+            }
         }
-    } 
+        for (int x = 2 * width / 3; x < width - 1; x++)
+        {
+            int gradienteX = 0;
+            int gradienteY = 0;
+            for (int i = -1; i < 2; i++)
+            {
+                for (int j = -1; j < 2; j++)
+                {
+                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
+                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
+                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
+                }
+            }
 
+            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
+            if (y < height / 3)
+            {
+                medias[0][2] += mag;
+            }
+            else if (y < 2 * height / 3)
+            {
+                medias[1][2] += mag;
+            }
+            else
+            {
+                medias[2][2] += mag;
+            }
+        }
+    }
 
+    int sectionHeight = (height - 1) / 3;
+    int sectionWidth = (width - 1) / 3;
 
+    int topMidNorm = sectionHeight * sectionWidth;
+    int botNorm = (height - 2 * sectionHeight) * (width - 2 * sectionHeight);
 
+    for (int i = 0; i < 3; i++)
+    {
+        medias[0][i] /= topMidNorm;
+        medias[1][i] /= topMidNorm;
+        medias[2][i] /= botNorm;
+    }
 
+    bool (*visited)[width] = calloc(height, sizeof(bool[width]));
+
+    for (int y = 1; y < height - 1; y++)
+    {
+        for (int x = 1; x < width - 1; x++)
+        {
+            int gradienteX = 0;
+            int gradienteY = 0;
+            for (int i = -1; i < 2; i++)
+            {
+                for (int j = -1; j < 2; j++)
+                {
+                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
+                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
+                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
+                }
+            }
+
+            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
+
+            // jeito melhor de determinar a secao da imagem onde esta, mas nao vou alterar o da outra funcao
+            int sectionY = (y < height / 3) ? 0 : (y < 2 * height / 3) ? 1
+                                                                       : 2;
+            int sectionX = (x < width / 3) ? 0 : (x < 2 * width / 3) ? 1
+                                                                     : 2;
+            // meu vscode usa indentacao automatica e forca essa parte a ficar assim ^
+
+            if (mag > medias[sectionY][sectionX])
+            {
+                addNode(x, y, &arr, visited);
+            }
+        }
+    }
+
+    free(visited);
 
     srand(time(NULL));
 
     for (int i = 0; i < arr.size - 1; i++)
-    {   
+    {
         EdgeCoord *teste = &(arr.coord[i]);
 
         int offsetX = width - (width - teste->x);
-        int offsetY = height - (height - teste->y); 
+        int offsetY = height - (height - teste->y);
 
-        teste->x += ((rand()%width)-offsetX)/4;
-        teste->y += ((rand()%height)-offsetY)/4;
-        
+        teste->x += ((rand() % width) - offsetX) / 4;
+        teste->y += ((rand() % height) - offsetY) / 4;
     }
 
     for (int y = 0; y < height; y++)
@@ -290,23 +402,13 @@ int main(int argc, char **argv)
 
     clock_t tend = clock();
 
-    double tempo = ((double)(tend-tstart))/CLOCKS_PER_SEC;
+    double tempo = ((double)(tend - tstart)) / CLOCKS_PER_SEC;
 
-    printf("Tempo para carregar: %.6f segundos", tempo);
-    
-    /* for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            out[y][x].r = in[y][x].r;
-            out[y][x].g = in[y][x].g;
-            out[y][x].b = in[y][x].b;
-        }
-    } */
+    printf("Tempo para carregar: %.6f segundos\n", tempo);
+
     // Cria texturas em memória a partir dos pixels das imagens
     tex[0] = SOIL_create_OGL_texture((unsigned char *)pic[0].img, width, height, SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
     tex[1] = SOIL_create_OGL_texture((unsigned char *)pic[1].img, width, height, SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
-
 
     // Entra no loop de eventos, não retorna
     glutMainLoop();
