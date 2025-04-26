@@ -4,6 +4,7 @@
 #include <string.h> // Para usar strings
 #include <stdbool.h>
 #include <time.h>
+#include <omp.h>
 
 #ifdef WIN32
 #include <windows.h> // Apenas para Windows
@@ -131,46 +132,8 @@ void addNode(int x, int y, EdgeArray *edgeArray, bool (*visited)[width])
         }
     }*/
 
-    // Aqui era o principal problema de performance, foi melhor implementar um hash pra testar se foi visitado, mas mesmo assim vai ser lento sem multithreading (o que nao sei fazer)
+    // Aqui era o principal problema de performance, foi melhor implementar um hash pra testar se foi visitado, mas mesmo assim vai ser lento sem multithreading
 }
-
-// Usando EdgeNode como LinkedList
-/* EdgeCoord getNearestEdge(int x, int y, EdgeNode *head)
-{
-    EdgeNode *aux = head;
-    EdgeCoord nearest = aux->coord;
-    float nearestDist = sqrt(pow(nearest.x, 2) + pow(nearest.y, 2));
-    while (aux != NULL)
-    {
-        aux = aux->next;
-        EdgeCoord curr = aux->coord;
-        float currDist = sqrt(pow(curr.x, 2) + pow(curr.y, 2));
-        if (currDist < nearestDist)
-        {
-            nearest = curr;
-            nearestDist = currDist;
-        }
-    }
-    return nearest;
-}
-
-EdgeNode *addNode(int x, int y, EdgeNode *head)
-{
-    EdgeNode *aux = head;
-    EdgeCoord curr;
-    while (aux != NULL)
-    {
-        curr = aux->coord;
-        if (curr.x == x && curr.y == y)
-            return head;
-        aux = aux->next;
-    }
-    aux = malloc(sizeof(EdgeNode));
-    aux->coord = (EdgeCoord){x, y};
-    aux->next = head;
-    head = aux;
-    return head;
-} */
 
 int main(int argc, char **argv)
 {
@@ -239,109 +202,7 @@ int main(int argc, char **argv)
 
     int medias[3][3];
 
-    for (int y = 1; y < height - 1; y++)
-    {
-        for (int x = 1; x < width / 3; x++)
-        {
-            int gradienteX = 0;
-            int gradienteY = 0;
-            for (int i = -1; i < 2; i++)
-            {
-                for (int j = -1; j < 2; j++)
-                {
-                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
-                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
-                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
-                }
-            }
-
-            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
-            if (y < height / 3)
-            {
-                medias[0][0] += mag;
-            }
-            else if (y < 2 * height / 3)
-            {
-                medias[1][0] += mag;
-            }
-            else
-            {
-                medias[2][0] += mag;
-            }
-        }
-        for (int x = width / 3; x < 2 * width / 3; x++)
-        {
-            int gradienteX = 0;
-            int gradienteY = 0;
-            for (int i = -1; i < 2; i++)
-            {
-                for (int j = -1; j < 2; j++)
-                {
-                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
-                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
-                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
-                }
-            }
-
-            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
-            if (y < height / 3)
-            {
-                medias[0][1] += mag;
-            }
-            else if (y < 2 * height / 3)
-            {
-                medias[1][1] += mag;
-            }
-            else
-            {
-                medias[2][1] += mag;
-            }
-        }
-        for (int x = 2 * width / 3; x < width - 1; x++)
-        {
-            int gradienteX = 0;
-            int gradienteY = 0;
-            for (int i = -1; i < 2; i++)
-            {
-                for (int j = -1; j < 2; j++)
-                {
-                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
-                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
-                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
-                }
-            }
-
-            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
-            if (y < height / 3)
-            {
-                medias[0][2] += mag;
-            }
-            else if (y < 2 * height / 3)
-            {
-                medias[1][2] += mag;
-            }
-            else
-            {
-                medias[2][2] += mag;
-            }
-        }
-    }
-
-    int sectionHeight = (height - 1) / 3;
-    int sectionWidth = (width - 1) / 3;
-
-    int topMidNorm = sectionHeight * sectionWidth;
-    int botNorm = (height - 2 * sectionHeight) * (width - 2 * sectionHeight);
-
-    for (int i = 0; i < 3; i++)
-    {
-        medias[0][i] /= topMidNorm;
-        medias[1][i] /= topMidNorm;
-        medias[2][i] /= botNorm;
-    }
-
-    bool (*visited)[width] = calloc(height, sizeof(bool[width]));
-
+#pragma omp parallel for collapse(2)
     for (int y = 1; y < height - 1; y++)
     {
         for (int x = 1; x < width - 1; x++)
@@ -360,7 +221,49 @@ int main(int argc, char **argv)
 
             int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
 
-            // jeito melhor de determinar a secao da imagem onde esta, mas nao vou alterar o da outra funcao
+            int sectionY = (y < height / 3) ? 0 : (y < 2 * height / 3) ? 1
+                                                                       : 2;
+            int sectionX = (x < width / 3) ? 0 : (x < 2 * width / 3) ? 1
+                                                                     : 2;
+#pragma omp atomic
+            medias[sectionY][sectionX] += mag;
+        }
+    }
+
+    int sectionHeight = (height - 1) / 3;
+    int sectionWidth = (width - 1) / 3;
+
+    int topMidNorm = sectionHeight * sectionWidth;
+    int botNorm = (height - 2 * sectionHeight) * (width - 2 * sectionHeight);
+
+    for (int i = 0; i < 3; i++)
+    {
+        medias[0][i] /= topMidNorm;
+        medias[1][i] /= topMidNorm;
+        medias[2][i] /= botNorm;
+    }
+
+    bool (*visited)[width] = calloc(height, sizeof(bool[width]));
+
+#pragma omp parallel for collapse(2)
+    for (int y = 1; y < height - 1; y++)
+    {
+        for (int x = 1; x < width - 1; x++)
+        {
+            int gradienteX = 0;
+            int gradienteY = 0;
+            for (int i = -1; i < 2; i++)
+            {
+                for (int j = -1; j < 2; j++)
+                {
+                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
+                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
+                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
+                }
+            }
+
+            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
+
             int sectionY = (y < height / 3) ? 0 : (y < 2 * height / 3) ? 1
                                                                        : 2;
             int sectionX = (x < width / 3) ? 0 : (x < 2 * width / 3) ? 1
@@ -369,6 +272,7 @@ int main(int argc, char **argv)
 
             if (mag > medias[sectionY][sectionX])
             {
+#pragma omp critical
                 addNode(x, y, &arr, visited);
             }
         }
@@ -389,6 +293,7 @@ int main(int argc, char **argv)
         teste->y += ((rand() % height) - offsetY) / 4;
     }
 
+#pragma omp parallel for collapse(2)
     for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
