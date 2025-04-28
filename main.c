@@ -4,6 +4,7 @@
 #include <string.h> // Para usar strings
 #include <stdbool.h>
 #include <time.h>
+#include <omp.h>
 
 #ifdef WIN32
 #include <windows.h> // Apenas para Windows
@@ -21,7 +22,6 @@
 
 // SOIL é a biblioteca para leitura das imagens
 #include "SOIL.h"
-
 
 // Um pixel Pixel (24 bits)
 typedef struct
@@ -109,65 +109,34 @@ EdgeCoord getNearestEdge(int x, int y, EdgeArray *edgeArray)
     return nearest;
 }
 
-void addNode(int x, int y, EdgeArray *edgeArray)
+void addNode(int x, int y, EdgeArray *edgeArray, bool (*visited)[width])
 {
+    if (visited[y][x])
+        return;
+
+    visited[y][x] = true;
+
     if (edgeArray->size >= 500000)
     {
         printf("Error: EdgeArray capacity exceeded.\n");
         return;
     }
+
+    edgeArray->coord[edgeArray->size++] = (EdgeCoord){x, y};
+    /*
     for (int i = 0; i < edgeArray->size; i++)
     {
         if (edgeArray->coord[i].x == x && edgeArray->coord[i].y == y)
         {
             return;
         }
-    }
-    EdgeCoord aux = (EdgeCoord) {x, y};
-    edgeArray->coord[edgeArray->size] = aux;
-    edgeArray->size += 1;
-}
+    }*/
 
-// Usando EdgeNode como LinkedList
-/* EdgeCoord getNearestEdge(int x, int y, EdgeNode *head)
-{
-    EdgeNode *aux = head;      
-    EdgeCoord nearest = aux->coord;
-    float nearestDist = sqrt(pow(nearest.x, 2) + pow(nearest.y, 2));
-    while (aux != NULL)       
-    {
-        aux = aux->next;
-        EdgeCoord curr = aux->coord;
-        float currDist = sqrt(pow(curr.x, 2) + pow(curr.y, 2));
-        if (currDist < nearestDist)
-        {
-            nearest = curr;
-            nearestDist = currDist;
-        }
-    }
-    return nearest;
+    // Aqui era o principal problema de performance, foi melhor implementar um hash pra testar se foi visitado, mas mesmo assim vai ser lento sem multithreading
 }
-
-EdgeNode *addNode(int x, int y, EdgeNode *head)
-{
-    EdgeNode *aux = head;
-    EdgeCoord curr;
-    while (aux != NULL)
-    {
-        curr = aux->coord;
-        if (curr.x == x && curr.y == y)
-            return head;
-        aux = aux->next;
-    }
-    aux = malloc(sizeof(EdgeNode));
-    aux->coord = (EdgeCoord){x, y};
-    aux->next = head;
-    head = aux;
-    return head;
-} */
 
 int main(int argc, char **argv)
-{   
+{
 
     clock_t tstart = clock();
 
@@ -224,59 +193,115 @@ int main(int argc, char **argv)
     // ...
     // ...
     // Exemplo: copia apenas o componente vermelho para a saida
-    
-    int sobelX[3][3] = {{-1, 0, 1}, {-2, 0 , 2}, {-1, 0, 1}};
-    int sobelY[3][3] = {{-1, -2, -1}, {0, 0 , 0}, {1, 2, 1}};
+
+    int sobelX[3][3] = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
+    int sobelY[3][3] = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
+
+    int threads = omp_get_max_threads();
+    omp_set_num_threads(threads);
 
     EdgeArray arr;
     arr.size = 0;
 
-    
+    int medias[3][3];
 
-    //Obs, isso tudo se tornou extremamente ineficiente, talvez fosse melhor comparar cada pixel com uma regiao vizinha ao inves 
-    //de so comparar com o da direita e o de baixo, pra assim nao precisar calcular a variancia e evitar ruido na imagem
-
+    #pragma omp parallel for collapse(2)
     for (int y = 1; y < height - 1; y++)
     {
-        for (int x = 1; x < width -1; x++)
+        for (int x = 1; x < width - 1; x++)
         {
             int gradienteX = 0;
             int gradienteY = 0;
-            for(int i=-1; i<2; i++){
-                for(int j = -1; j<2; j++){
-                    int grayscalePix = (in[y+i][x+j].r*0.299 + 0.587*in[y+i][x+j].g + 0.114*in[y+i][x+j].b);
-                    gradienteX += grayscalePix * sobelX[i+1][j+1];
-                    gradienteY += grayscalePix * sobelY[i+1][j+1];
+            for (int i = -1; i < 2; i++)
+            {
+                for (int j = -1; j < 2; j++)
+                {
+                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
+                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
+                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
                 }
             }
 
-            int mag = (int)sqrt(gradienteX*gradienteX + gradienteY*gradienteY);
-            if( mag > 100){
-                addNode(x, y, &arr);
+            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
+
+            int sectionY = (y < height / 3) ? 0 : (y < 2 * height / 3) ? 1
+                                                                       : 2;
+            int sectionX = (x < width / 3) ? 0 : (x < 2 * width / 3) ? 1
+                                                                     : 2;
+            #pragma omp atomic
+            medias[sectionY][sectionX] += mag;
+        }
+    }
+
+    int sectionHeight = (height - 1) / 3;
+    int sectionWidth = (width - 1) / 3;
+
+    int topMidNorm = sectionHeight * sectionWidth;
+    int botNorm = (height - 2 * sectionHeight) * (width - 2 * sectionHeight);
+
+    for (int i = 0; i < 3; i++)
+    {
+        medias[0][i] /= topMidNorm;
+        medias[1][i] /= topMidNorm;
+        medias[2][i] /= botNorm;
+    }
+
+    bool (*visited)[width] = calloc(height, sizeof(bool[width]));
+
+    #pragma omp parallel for collapse(2)
+    for (int y = 1; y < height - 1; y++)
+    {
+        for (int x = 1; x < width - 1; x++)
+        {
+            int gradienteX = 0;
+            int gradienteY = 0;
+            for (int i = -1; i < 2; i++)
+            {
+                for (int j = -1; j < 2; j++)
+                {
+                    int grayscalePix = (in[y + i][x + j].r * 0.299 + 0.587 * in[y + i][x + j].g + 0.114 * in[y + i][x + j].b);
+                    gradienteX += grayscalePix * sobelX[i + 1][j + 1];
+                    gradienteY += grayscalePix * sobelY[i + 1][j + 1];
+                }
             }
 
+            int mag = (int)sqrt(gradienteX * gradienteX + gradienteY * gradienteY);
+
+            int sectionY = (y < height / 3) ? 0 : (y < 2 * height / 3) ? 1
+                                                                       : 2;
+            int sectionX = (x < width / 3) ? 0 : (x < 2 * width / 3) ? 1
+                                                                     : 2;
+            // meu vscode usa indentacao automatica e forca essa parte a ficar assim ^
+
+            if (mag > medias[sectionY][sectionX])
+            {
+                #pragma omp critical
+                addNode(x, y, &arr, visited);
+            }
         }
-    } 
+    }
 
+    free(visited);
 
-
-
-
+    EdgeArray arrCopy;
+    arrCopy.size = arr.size;
 
     srand(time(NULL));
 
     for (int i = 0; i < arr.size - 1; i++)
-    {   
+    {
         EdgeCoord *teste = &(arr.coord[i]);
 
-        int offsetX = width - (width - teste->x);
-        int offsetY = height - (height - teste->y); 
+        arrCopy.coord[i] = *teste;    
 
-        teste->x += ((rand()%width)-offsetX)/4;
-        teste->y += ((rand()%height)-offsetY)/4;
-        
+        int offsetX = width - (width - teste->x);
+        int offsetY = height - (height - teste->y);
+
+        teste->x += ((rand() % width) - offsetX) / 4;
+        teste->y += ((rand() % height) - offsetY) / 4;
     }
 
+    #pragma omp parallel for collapse(2)
     for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
@@ -288,25 +313,23 @@ int main(int argc, char **argv)
         }
     }
 
+    for(int i=0; i<arrCopy.size;i++){
+        EdgeCoord curr = arrCopy.coord[i];
+        in[curr.y][curr.x].r = 0x85;
+        in[curr.y][curr.x].g = 0x00;
+        in[curr.y][curr.x].b = 0xFF; 
+    }
+
     clock_t tend = clock();
 
-    double tempo = ((double)(tend-tstart))/CLOCKS_PER_SEC;
+    double tempo = ((double)(tend - tstart)) / CLOCKS_PER_SEC;
 
-    printf("Tempo para carregar: %.6f segundos", tempo);
-    
-    /* for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            out[y][x].r = in[y][x].r;
-            out[y][x].g = in[y][x].g;
-            out[y][x].b = in[y][x].b;
-        }
-    } */
+
+    printf("Tempo para carregar: %.6f segundos\nUsando %d threads\n", tempo/omp_get_max_threads(), omp_get_max_threads());
+
     // Cria texturas em memória a partir dos pixels das imagens
     tex[0] = SOIL_create_OGL_texture((unsigned char *)pic[0].img, width, height, SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
     tex[1] = SOIL_create_OGL_texture((unsigned char *)pic[1].img, width, height, SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
-
 
     // Entra no loop de eventos, não retorna
     glutMainLoop();
