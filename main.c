@@ -197,12 +197,15 @@ int main(int argc, char **argv)
     int sobelX[3][3] = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
     int sobelY[3][3] = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
 
+    int threads = omp_get_max_threads();
+    omp_set_num_threads(threads);
+
     EdgeArray arr;
     arr.size = 0;
 
     int medias[3][3];
 
-#pragma omp parallel for collapse(2)
+    #pragma omp parallel for collapse(2)
     for (int y = 1; y < height - 1; y++)
     {
         for (int x = 1; x < width - 1; x++)
@@ -225,7 +228,7 @@ int main(int argc, char **argv)
                                                                        : 2;
             int sectionX = (x < width / 3) ? 0 : (x < 2 * width / 3) ? 1
                                                                      : 2;
-#pragma omp atomic
+            #pragma omp atomic
             medias[sectionY][sectionX] += mag;
         }
     }
@@ -245,7 +248,7 @@ int main(int argc, char **argv)
 
     bool (*visited)[width] = calloc(height, sizeof(bool[width]));
 
-#pragma omp parallel for collapse(2)
+    #pragma omp parallel for collapse(2)
     for (int y = 1; y < height - 1; y++)
     {
         for (int x = 1; x < width - 1; x++)
@@ -272,7 +275,7 @@ int main(int argc, char **argv)
 
             if (mag > medias[sectionY][sectionX])
             {
-#pragma omp critical
+                #pragma omp critical
                 addNode(x, y, &arr, visited);
             }
         }
@@ -280,11 +283,16 @@ int main(int argc, char **argv)
 
     free(visited);
 
+    EdgeArray arrCopy;
+    arrCopy.size = arr.size;
+
     srand(time(NULL));
 
     for (int i = 0; i < arr.size - 1; i++)
     {
         EdgeCoord *teste = &(arr.coord[i]);
+
+        arrCopy.coord[i] = *teste;    
 
         int offsetX = width - (width - teste->x);
         int offsetY = height - (height - teste->y);
@@ -293,7 +301,7 @@ int main(int argc, char **argv)
         teste->y += ((rand() % height) - offsetY) / 4;
     }
 
-#pragma omp parallel for collapse(2)
+    #pragma omp parallel for collapse(2)
     for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
@@ -305,11 +313,19 @@ int main(int argc, char **argv)
         }
     }
 
+    for(int i=0; i<arrCopy.size;i++){
+        EdgeCoord curr = arrCopy.coord[i];
+        in[curr.y][curr.x].r = 0x85;
+        in[curr.y][curr.x].g = 0x00;
+        in[curr.y][curr.x].b = 0xFF; 
+    }
+
     clock_t tend = clock();
 
     double tempo = ((double)(tend - tstart)) / CLOCKS_PER_SEC;
 
-    printf("Tempo para carregar: %.6f segundos\n", tempo);
+
+    printf("Tempo para carregar: %.6f segundos\nUsando %d threads\n", tempo/omp_get_max_threads(), omp_get_max_threads());
 
     // Cria texturas em memória a partir dos pixels das imagens
     tex[0] = SOIL_create_OGL_texture((unsigned char *)pic[0].img, width, height, SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
